@@ -1,0 +1,208 @@
+---
+title: "Prediction of Weight Lifting Exercises using R"
+author: "B Vaibhav Mallya"
+---
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(caret)
+library(knitr)
+library(corrplot)
+library(plotly)
+library(correlationfunnel)
+library(GGally)
+library(e1071)
+Train<-read.csv("pml-training.csv", stringsAsFactors = F,na.strings = c("","NA","#DIV/0!"))
+Test<-read.csv("pml-testing.csv", stringsAsFactors = F,na.strings = c("","NA","#DIV/0!"))
+dim(Train); 
+dim(Test)
+```
+
+```{r}
+train_split <- createDataPartition(Train$classe, p = 0.8, list = F)
+Val_data <- Train[-train_split,]
+Train <- Train[train_split,]
+dim(Train); 
+dim(Val_data)
+```
+
+```{r}
+table(Train$classe)/nrow(Train)
+```
+
+```{r}
+mb <- sapply(select(Train,names(Train)[grepl("_belt",names(Train))]),function(x) sum(is.na(x)))
+mb
+```
+
+```{r}
+ma <- sapply(select(Train,names(Train)[grepl("_arm",names(Train))]),function(x) sum(is.na(x)))
+ma
+```  
+
+```{r}
+mf <- sapply(select(Train,names(Train)[grepl("_forearm",names(Train))]),function(x) sum(is.na(x)))
+mf
+```  
+
+```{r}
+md <- sapply(select(Train,names(Train)[grepl("_dumbbell",names(Train))]),function(x) sum(is.na(x)))
+md
+``` 
+
+```{r}
+dc <- c(names(mb[mb!=0]), names(ma[ma!=0]),names(mf[mf!=0]),names(md[md!=0]))
+length(dc)
+```
+
+```{r}
+data_an<-tbl_df(Train%>%select(-dc,-c(X,user_name,raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp,new_window,num_window)))
+data_an$classe<-as.factor(data_an$classe)
+data_an[,1:52]<-lapply(data_an[,1:52],as.numeric)
+dim(data_an)
+```
+
+```{r,fig.height=10,fig.width=10}
+c_c <- cor(select(data_an, -classe))
+diag(c_c) <- 0
+c_c <- which(abs(c_c)>0.8,arr.ind = T)
+c_c <- unique(row.names(c_c))
+corrplot(cor(select(data_an,c_c)),type="upper",order="hclust",method="number")
+```
+
+```{r}
+cfd <-data_an%>%binarize(n_bins=4,thresh_infreq=0.01)
+```
+
+```{r,fig.align="center",fig.width=8,fig.height=10}
+ca <- cfd %>% correlate(target=classe__A) 
+```
+
+```{r, echo=FALSE, eval=FALSE}
+ta <- head(ca %>% mutate(corr = abs(correlation)) %>%arrange(desc(corr))%>%select(feature) %>% unique(),20)
+ta$feature[which(ta$feature%in%c_c)]
+```
+
+```{r,fig.align="center",fig.width=8,fig.height=10}
+cb<-cfd%>%correlate(target=classe__B)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+tb <- head(cb%>%mutate(corr = abs(correlation)) %>% arrange(desc(corr)) %>% select(feature) %>% unique(),20)
+tb$feature[which(tb$feature %in% c_c)]
+```
+
+```{r,fig.align="center",fig.width=8,fig.height=10}
+cc <- cfd%>%correlate(target=classe__C)
+
+```
+
+```{r, echo=FALSE, eval=FALSE}
+tc <- head(cc%>%mutate(corr=abs(correlation))%>%arrange(desc(corr)) %>% select(feature) %>% unique(),20)
+tc$feature[which(tc$feature %in% c_c)]
+```
+
+```{r,fig.align="center",fig.width=8,fig.height=10}
+cd<-cfd%>%correlate(target=classe__D)
+
+```
+
+```{r, echo=FALSE, eval=FALSE}
+td <- head(cd%>%mutate(corr=abs(correlation) %>%arrange(desc(corr)) %>% select(feature) %>% unique(),20)
+td$feature[which(td$feature %in% c_c)]
+```
+
+```{r,fig.align="center",fig.width=8,fig.height=10}
+ce<-cfd %>% correlate(target = classe__E)
+```
+
+```{r, echo=FALSE, eval=FALSE}
+te<-head(corr_e %>% mutate(corr = abs(correlation))%>%arrange(desc(corr)) %>% select(feature) %>% unique(),20)
+te$feature[which(te$feature%in%c_c)]
+```
+
+```{r}
+a_col <- c("magnet_arm_x", "pitch_forearm" , "magnet_dumbbell_y", "roll_forearm", "gyros_dumbbell_y") 
+b_col <- c("magnet_dumbbell_y", "magnet_dumbbell_x" , "roll_dumbbell" , 
+           "magnet_belt_y" , "accel_dumbbell_x" )
+c_col <- c("magnet_dumbbell_y", "roll_dumbbell" , "accel_dumbbell_y" , 
+           "magnet_dumbbell_x", "magnet_dumbbell_z")
+d_col <- c("pitch_forearm" , "magnet_arm_y" , "magnet_forearm_x",
+           "accel_dumbbell_y", "accel_forearm_x")
+e_col <- c("magnet_belt_y" , "magnet_belt_z" , "roll_belt", 
+           "gyros_belt_z" , "magnet_dumbbell_y")
+fc <- character()
+for(c in c(a_col,b_col,c_col,d_col,e_col)){
+  fc <- union(fc,c)
+}
+data_an2 <- data_an%>%select(fc,classe)
+data.frame("arm" = sum(grepl("_arm",fc)),"forearm"=sum(grepl("_forearm",fc)),"belt"=sum(grepl("_belt",fc)),"dumbbell"=sum(grepl("_dumbbell",fc)))
+```
+
+```{r, fig.align="center",fig.height=15,fig.width=15}
+m_d<-function(data, mapping, ...) {
+  ggplot(data = data, mapping=mapping)+geom_density(..., alpha = 0.3)+scale_fill_brewer(palette="Set2") 
+}
+m_p<-function(data, mapping, ...) {
+  ggplot(data = data, mapping=mapping)+geom_point(..., alpha = 0.1)+ scale_fill_brewer(palette="Set2") 
+}
+ggpairs(data_an2,columns = 1:5,aes(color = classe),lower = list(continuous = m_p),diag = list(continuous = m_d))
+```
+
+```{r,fig.align="center",fig.height=15,fig.width=15}
+ggpairs(data_an2,columns=6:10,aes(color=classe),lower=list(continuous=m_p),diag =list(continuous=m_d))
+```
+
+```{r,fig.align="center",fig.height=15,fig.width=15}
+ggpairs(data_an2,columns = 11:17,aes(color = classe),lower=list(continuous=m_p),diag=list(continuous=m_d))
+```
+
+```{r}
+TrainF <- Train %>% select(fc,classe)
+Val_dataF<-Val_data %>% select(fc,classe)
+TrainF[,1:17] <- sapply(TrainF[,1:17],as.numeric)
+Val_dataF[,1:17] <- sapply(Val_dataF[,1:17],as.numeric)
+lvl<-c("A", "B", "C", "D", "E")
+ppo <- preProcess(TrainF[,-18],method = c("center","scale","BoxCox"))
+Tr_x <- predict(ppo,select(TrainF,-classe))
+Tr_y <- factor(TrainF$classe,levels=lvl)
+V_x <- predict(ppo,select(Val_dataF,-classe))
+V_y<- factor(Val_dataF$classe,levels=lvl)
+C_tr <- trainControl(method="cv", number=5)
+CT_m <- train(x = Tr_x,y = Tr_y,method = "rpart", trControl = C_tr)
+RF_m <- train(x = Tr_x,y = Tr_y, method = "rf", trControl = C_tr,verbose=FALSE, metric = "Accuracy")
+GBM_m <- train(x = Tr_x,y = Tr_y,method = "gbm",trControl=C_tr,verbose=FALSE)
+SVM_m <- svm(x = Tr_x,y = Tr_y,kernel = "polynomial", cost = 10)
+```
+
+```{r}
+confusionMatrix(predict(CT_m,V_x),V_y)
+```
+
+```{r}
+confusionMatrix(predict(RF_m,V_x),V_y)
+```
+
+```{r}
+plot(RF_m$finalModel,main="Error VS no of tree")
+```
+
+```{r}
+confusionMatrix(predict(GBM_m,V_x),V_y)
+```
+
+```{r}
+confusionMatrix(predict(SVM_m,V_x),V_y)
+```
+
+```{r}
+Test2 <- Test %>% select(fc,problem_id)
+xTest <- Test2 %>% select(fc)
+result <- data.frame("problem_id" = Test$problem_id,"PREDICTION_RF"=predict(RF_m,xTest),"PREDICTION_GBM"=predict(GBM_m,xTest),"PREDICTION_SVM"=predict(SVM_m,xTest))
+result
+```
+
+```{r}
