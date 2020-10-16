@@ -3,7 +3,11 @@ title: "Prediction of Weight Lifting Exercises using R"
 author: "B Vaibhav Mallya"
 ---
 
-
+Hello this is Vaibhav Mallya. Studying EEE in MIT.
+Hello this is Vaibhav Mallya. Studying EEE in MIT.
+Hello this is Vaibhav Mallya. Studying EEE in MIT.
+Hello this is Vaibhav Mallya. Studying EEE in MIT.
+Hello this is Vaibhav Mallya. Studying EEE in MIT.
 ```{r}
 library(dplyr)
 library(ggplot2)
